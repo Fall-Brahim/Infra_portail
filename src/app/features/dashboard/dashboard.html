@@ -1,0 +1,298 @@
+<header class="page-header">
+  <div>
+    <h1>Cluster</h1>
+    <p class="page-header__subtitle">pve-cluster — vue d'ensemble</p>
+  </div>
+  <div class="page-header__actions">
+    <label class="switch">
+      <input type="checkbox" [checked]="autoRefresh()" (change)="toggleAutoRefresh()" />
+      <span>Auto-refresh (15 s)</span>
+    </label>
+    <button class="btn" type="button" (click)="refresh()">Actualiser</button>
+  </div>
+</header>
+
+@if (error(); as message) {
+  <p class="alert alert--error" role="alert">{{ message }}</p>
+}
+
+@if (hasOfflineNodes()) {
+  <div class="alert alert--warning" role="alert">
+    <strong>{{ offlineNodes().length }} nœud(s) hors ligne :</strong>
+    {{ offlineNodes().map(node => node.name).join(', ') }} — les métriques de ces nœuds
+    ne sont pas actualisées.
+  </div>
+}
+
+@if (loading()) {
+  <p class="muted">Chargement…</p>
+}
+
+@if (summary(); as data) {
+  <section class="cards">
+    <article class="card card--health" [class]="'is-' + data.health">
+      <h2>Santé</h2>
+      <p class="card__value">
+        @switch (data.health) {
+          @case ('ok') { Opérationnel }
+          @case ('degraded') { Dégradé }
+          @default { Critique }
+        }
+      </p>
+      <p class="card__hint">
+        @if (data.quorate === true) {
+          Quorum atteint
+        } @else if (data.quorate === false) {
+          Quorum perdu
+        } @else {
+          Quorum inconnu (privilèges insuffisants)
+        }
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>Nœuds</h2>
+      <p class="card__value">{{ data.nodes_online }} <small>/ {{ data.nodes_online + data.nodes_offline }}</small></p>
+      <p class="card__hint">
+        @if (data.nodes_offline > 0) {
+          {{ data.nodes_offline }} hors ligne
+        } @else {
+          tous en ligne
+        }
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>CPU</h2>
+      <p class="card__value">{{ formatPercent(data.cpu.used_pct) }}</p>
+      <p class="card__hint">{{ data.cpu.cores }} cœurs</p>
+      <div class="bar"><span [style.width.%]="data.cpu.used_pct"></span></div>
+    </article>
+
+    <article class="card">
+      <h2>Mémoire</h2>
+      <p class="card__value">{{ formatPercent(data.memory.used_pct) }}</p>
+      <p class="card__hint">
+        {{ formatBytes(data.memory.used) }} / {{ formatBytes(data.memory.total) }}
+      </p>
+      <div class="bar"><span [style.width.%]="data.memory.used_pct"></span></div>
+    </article>
+
+    <article class="card">
+      <h2>Stockage</h2>
+      <p class="card__value">{{ formatPercent(data.storage.used_pct) }}</p>
+      <p class="card__hint">
+        {{ formatBytes(data.storage.used) }} / {{ formatBytes(data.storage.total) }}
+      </p>
+      <div class="bar"><span [style.width.%]="data.storage.used_pct"></span></div>
+    </article>
+
+    <article class="card">
+      <h2>VMs</h2>
+      <p class="card__value">{{ data.vms.running }} <small>en marche</small></p>
+      <p class="card__hint">
+        {{ data.vms.stopped }} arrêtées · {{ data.vms.templates }} templates
+      </p>
+    </article>
+
+    <article class="card">
+      <h2>Conteneurs LXC</h2>
+      <p class="card__value">{{ data.lxc.running }} <small>en marche</small></p>
+      <p class="card__hint">{{ data.lxc.stopped }} arrêtés</p>
+    </article>
+  </section>
+}
+
+<!-- ------------------------------------------------------------------ -->
+<!-- Historique                                                          -->
+<!-- ------------------------------------------------------------------ -->
+
+<section class="panel">
+  <header class="panel__header">
+    <h2>Historique du cluster</h2>
+    <div class="segmented" role="group" aria-label="Période d'historique">
+      @for (item of timeframes; track item.value) {
+        <button
+          type="button"
+          class="segmented__item"
+          [class.is-active]="timeframe() === item.value"
+          (click)="setTimeframe(item.value)"
+        >
+          {{ item.label }}
+        </button>
+      }
+    </div>
+  </header>
+
+  @if (historyError(); as message) {
+    <p class="alert alert--error" role="alert">{{ message }}</p>
+  }
+
+  <div class="grid-2">
+    <div class="chart-block">
+      <h3>CPU (%)</h3>
+      @if (historyLoading()) {
+        <div class="skeleton skeleton--chart"></div>
+      } @else {
+        <app-line-chart
+          [series]="cpuSeries()"
+          [labels]="historyLabels()"
+          unit="%"
+          [height]="200"
+        />
+      }
+    </div>
+
+    <div class="chart-block">
+      <h3>RAM utilisée (Go)</h3>
+      @if (historyLoading()) {
+        <div class="skeleton skeleton--chart"></div>
+      } @else {
+        <app-line-chart
+          [series]="memorySeries()"
+          [labels]="historyLabels()"
+          unit="Go"
+          [height]="200"
+        />
+      }
+    </div>
+
+    <div class="chart-block">
+      <h3>Réseau (Ko/s)</h3>
+      @if (historyLoading()) {
+        <div class="skeleton skeleton--chart"></div>
+      } @else {
+        <app-line-chart
+          [series]="networkSeries()"
+          [labels]="historyLabels()"
+          unit="Ko/s"
+          [height]="200"
+        />
+      }
+    </div>
+
+    <div class="chart-block">
+      <h3>Répartition des VMs</h3>
+      @if (loading()) {
+        <div class="skeleton skeleton--chart"></div>
+      } @else {
+        <app-donut-chart
+          [series]="vmDonutSeries()"
+          [labels]="vmDonutLabels()"
+          [height]="200"
+          emptyMessage="Aucune VM dans le cluster."
+        />
+      }
+    </div>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- Charge par nœud                                                     -->
+<!-- ------------------------------------------------------------------ -->
+
+<section class="panel">
+  <header class="panel__header">
+    <h2>Charge par nœud</h2>
+    <span class="legend">
+      <span class="legend__item"><i class="dot dot--ok"></i> normal</span>
+      <span class="legend__item"><i class="dot dot--warn"></i> &gt; 75 %</span>
+      <span class="legend__item"><i class="dot dot--danger"></i> &gt; 90 %</span>
+    </span>
+  </header>
+
+  <div class="grid-2">
+    <div class="chart-block">
+      <h3>CPU par nœud (%)</h3>
+      @if (loading()) {
+        <div class="skeleton skeleton--chart"></div>
+      } @else {
+        <app-bar-chart
+          [series]="nodeCpuSeries()"
+          [labels]="nodeLabels()"
+          unit="%"
+          [height]="200"
+          emptyMessage="Aucun nœud à afficher."
+        />
+      }
+    </div>
+
+    <div class="chart-block">
+      <h3>RAM par nœud (%)</h3>
+      @if (loading()) {
+        <div class="skeleton skeleton--chart"></div>
+      } @else {
+        <app-bar-chart
+          [series]="nodeMemorySeries()"
+          [labels]="nodeLabels()"
+          unit="%"
+          [height]="200"
+          emptyMessage="Aucun nœud à afficher."
+        />
+      }
+    </div>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------------ -->
+<!-- Nœuds                                                               -->
+<!-- ------------------------------------------------------------------ -->
+
+<section class="panel">
+  <header class="panel__header">
+    <h2>Nœuds du cluster</h2>
+  </header>
+
+  @if (nodes().length === 0 && !loading()) {
+    <p class="muted">Aucun nœud à afficher.</p>
+  }
+
+  @if (nodes().length > 0) {
+    <div class="table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>État</th>
+            <th>CPU</th>
+            <th>Mémoire</th>
+            <th>Disque</th>
+            <th>Uptime</th>
+            <th>VMs</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (node of nodes(); track node.name) {
+            <tr>
+              <td class="mono">{{ node.name }}</td>
+              <td>
+                <span class="badge" [class.is-online]="node.status === 'online'" [class.is-offline]="node.status === 'offline'">
+                  {{ node.status === 'online' ? 'En ligne' : 'Hors ligne' }}
+                </span>
+              </td>
+              <td>{{ formatPercent(node.cpu_pct) }}</td>
+              <td>
+                @if (node.status === 'online') {
+                  {{ formatBytes(node.memory.used) }} / {{ formatBytes(node.memory.total) }}
+                } @else {
+                  —
+                }
+              </td>
+              <td>
+                @if (node.status === 'online') {
+                  {{ formatBytes(node.disk.used) }} / {{ formatBytes(node.disk.total) }}
+                } @else {
+                  —
+                }
+              </td>
+              <td>{{ formatUptime(node.uptime) }}</td>
+              <td>
+                <a [routerLink]="['/vms']" [queryParams]="{ node: node.name }">{{ node.vms }}</a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>

@@ -1,0 +1,163 @@
+<header class="page-header">
+  <div>
+    <h1>Journal d'audit</h1>
+    <p class="page-header__subtitle">
+      {{ page().count }} action(s) enregistrée(s) — lecture seule
+    </p>
+  </div>
+</header>
+
+<form class="filters" [formGroup]="filters" (ngSubmit)="applyFilters()">
+  <label class="field">
+    <span>Utilisateur</span>
+    <input type="text" formControlName="user" placeholder="tech" />
+  </label>
+
+  <label class="field">
+    <span>Action</span>
+    <select formControlName="action">
+      <option value="">Toutes</option>
+      <option value="start">Démarrage</option>
+      <option value="stop">Arrêt</option>
+      <option value="shutdown">Arrêt orderly</option>
+      <option value="reboot">Redémarrage</option>
+      <option value="vnc">Console</option>
+    </select>
+  </label>
+
+  <label class="field">
+    <span>VM ID</span>
+    <input type="number" formControlName="vmid" placeholder="100" />
+  </label>
+
+  <label class="field">
+    <span>Résultat</span>
+    <select formControlName="status">
+      <option value="">Tous</option>
+      <option value="success">Succès</option>
+      <option value="failed">Échec</option>
+    </select>
+  </label>
+
+  <label class="field">
+    <span>Du</span>
+    <input type="date" formControlName="date_from" />
+  </label>
+
+  <label class="field">
+    <span>Au</span>
+    <input type="date" formControlName="date_to" />
+  </label>
+
+  <div class="filters__actions">
+    <button class="btn btn--primary" type="submit">Filtrer</button>
+    <button class="btn btn--ghost" type="button" (click)="resetFilters()">Réinitialiser</button>
+  </div>
+</form>
+
+@if (error(); as message) {
+  <p class="alert alert--error" role="alert">{{ message }}</p>
+}
+
+<!-- ------------------------------------------------------------------ -->
+<!-- Statistiques                                                         -->
+<!-- ------------------------------------------------------------------ -->
+
+<section class="panel">
+  <header class="panel__header">
+    <h2>Actions par jour</h2>
+    <div class="segmented" role="group" aria-label="Période des statistiques">
+      <button
+        type="button"
+        class="segmented__item"
+        [class.is-active]="statsDays() === 7"
+        (click)="setStatsDays(7)"
+      >
+        7 j
+      </button>
+      <button
+        type="button"
+        class="segmented__item"
+        [class.is-active]="statsDays() === 30"
+        (click)="setStatsDays(30)"
+      >
+        30 j
+      </button>
+    </div>
+  </header>
+
+  @if (statsError(); as message) {
+    <p class="alert alert--error" role="alert">{{ message }}</p>
+  }
+
+  <div class="chart-block">
+    @if (statsLoading()) {
+      <div class="skeleton skeleton--chart"></div>
+    } @else {
+      <app-bar-chart
+        [series]="statsSeries()"
+        [labels]="statsLabels()"
+        unit="actions"
+        [height]="220"
+        emptyMessage="Aucune action enregistrée sur la période."
+      />
+    }
+  </div>
+</section>
+
+<section class="panel">
+  @if (loading()) {
+    <p class="muted">Chargement…</p>
+  } @else if (page().results.length === 0) {
+    <p class="muted">Aucune entrée pour ces critères.</p>
+  } @else {
+    <div class="table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Utilisateur</th>
+            <th>Action</th>
+            <th>VM</th>
+            <th>Nœud</th>
+            <th>Résultat</th>
+            <th>IP</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (log of page().results; track log.id) {
+            <tr>
+              <td class="nowrap">{{ formatDateTime(log.created_at) }}</td>
+              <td>{{ log.username || '—' }}</td>
+              <td>{{ actionLabel(log.action) }}</td>
+              <td>
+                @if (log.vmid) {
+                  <span class="mono">#{{ log.vmid }}</span> {{ log.vm_name }}
+                } @else {
+                  {{ log.vm_name || '—' }}
+                }
+              </td>
+              <td class="mono">{{ log.node || '—' }}</td>
+              <td>
+                <span class="badge" [class.is-online]="log.status === 'success'" [class.is-offline]="log.status === 'failed'">
+                  {{ log.status === 'success' ? 'Succès' : 'Échec' }}
+                </span>
+              </td>
+              <td class="mono">{{ log.ip_address || '—' }}</td>
+              <td class="muted">{{ log.message || '—' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="pagination">
+      <span class="muted">Page {{ currentPage() }} / {{ totalPages }}</span>
+      <div class="pagination__buttons">
+        <button class="btn btn--sm" type="button" [disabled]="currentPage() <= 1" (click)="load(currentPage() - 1)">Précédent</button>
+        <button class="btn btn--sm" type="button" [disabled]="currentPage() >= totalPages" (click)="load(currentPage() + 1)">Suivant</button>
+      </div>
+    </footer>
+  }
+</section>

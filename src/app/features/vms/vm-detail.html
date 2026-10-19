@@ -1,0 +1,264 @@
+<a class="back-link" routerLink="/vms">← Retour à la liste</a>
+
+@if (error(); as message) {
+  <p class="alert alert--error" role="alert">{{ message }}</p>
+}
+@if (notice(); as message) {
+  <p class="alert alert--success" role="status">{{ message }}</p>
+}
+
+@if (loading()) {
+  <p class="muted">Chargement…</p>
+}
+
+@if (vm(); as vm) {
+  <header class="page-header">
+    <div>
+      <h1>
+        {{ vm.name }}
+        <span class="mono muted">#{{ vm.vmid }}</span>
+      </h1>
+      <p class="page-header__subtitle">
+        {{ vm.type }} sur {{ vm.node }} —
+        @if (pending(); as action) {
+          <span class="badge badge--pending">
+            <span class="spinner" aria-hidden="true"></span>
+            {{ pendingLabels[action] }}
+          </span>
+        } @else {
+          <span class="badge" [class.is-online]="vm.status === 'running'" [class.is-offline]="vm.status === 'stopped'">
+            {{ statusLabel(vm.status) }}
+          </span>
+        }
+        @if (vm.template) {
+          <span class="badge badge--muted">template</span>
+        }
+      </p>
+    </div>
+
+    <div class="page-header__actions">
+      @if (!vm.template) {
+        @if (pending(); as action) {
+          <span class="muted">Action en cours…</span>
+        } @else if (vm.status === 'running') {
+          <button class="btn" type="button" (click)="runAction('shutdown')">Arrêter</button>
+          <button class="btn" type="button" (click)="runAction('reboot')">Redémarrer</button>
+          <button class="btn btn--danger" type="button" (click)="runAction('stop')">Forcer l'arrêt</button>
+          <button class="btn" type="button" (click)="openConsole()">Console</button>
+        } @else {
+          <button class="btn btn--primary" type="button" (click)="runAction('start')">Démarrer</button>
+          <button class="btn" type="button" (click)="openConsole()">Console</button>
+        }
+      }
+    </div>
+  </header>
+
+  <section class="cards">
+    <article class="card">
+      <h2>Adresse IP</h2>
+      <p class="card__value mono">{{ vm.ip ?? '—' }}</p>
+      <p class="card__hint">best effort (qemu-guest-agent)</p>
+    </article>
+    <article class="card">
+      <h2>CPU</h2>
+      <p class="card__value">{{ formatPercent(vm.runtime.cpu_pct) }}</p>
+      <p class="card__hint">{{ vm.config.cores }} cœurs</p>
+    </article>
+    <article class="card">
+      <h2>Mémoire</h2>
+      <p class="card__value">{{ formatBytes(vm.runtime.mem_used) }}</p>
+      <p class="card__hint">sur {{ formatBytes(vm.runtime.mem_total) }} — config : {{ vm.config.memory }} Mo</p>
+    </article>
+    <article class="card">
+      <h2>Uptime</h2>
+      <p class="card__value">{{ formatUptime(vm.runtime.uptime) }}</p>
+      <p class="card__hint">qmpstatus : {{ vm.runtime.qmpstatus || '—' }}</p>
+    </article>
+  </section>
+
+  <div class="grid-2">
+    <section class="panel">
+      <header class="panel__header">
+        <h2>Configuration</h2>
+      </header>
+      <dl class="details">
+        <dt>Type</dt>
+        <dd class="mono">{{ vm.type }}</dd>
+        <dt>OS</dt>
+        <dd>{{ vm.config.ostype || '—' }}</dd>
+        <dt>Cœurs</dt>
+        <dd>{{ vm.config.cores }}</dd>
+        <dt>Mémoire (config)</dt>
+        <dd>{{ vm.config.memory }} Mo</dd>
+        <dt>Pool</dt>
+        <dd>{{ vm.pool || '—' }}</dd>
+        <dt>Tags</dt>
+        <dd>
+          @if (vm.tags.length) {
+            @for (tag of vm.tags; track tag) {
+              <span class="tag">{{ tag }}</span>
+            }
+          } @else {
+            —
+          }
+        </dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <header class="panel__header"><h2>Disques</h2></header>
+      @if (vm.config.disks.length === 0) {
+        <p class="muted">Aucun disque.</p>
+      } @else {
+        <table class="table">
+          <thead>
+            <tr><th>Clé</th><th>Stockage</th><th>Taille</th><th>Format</th></tr>
+          </thead>
+          <tbody>
+            @for (disk of vm.config.disks; track disk.key) {
+              <tr>
+                <td class="mono">{{ disk.key }}</td>
+                <td>{{ disk.storage || '—' }}</td>
+                <td>{{ disk.size || '—' }}</td>
+                <td>{{ disk.format || '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+
+    <section class="panel">
+      <header class="panel__header"><h2>Réseau</h2></header>
+      @if (vm.config.network.length === 0) {
+        <p class="muted">Aucune interface.</p>
+      } @else {
+        <table class="table">
+          <thead>
+            <tr><th>Clé</th><th>Modèle</th><th>MAC</th><th>Bridge</th><th>VLAN</th></tr>
+          </thead>
+          <tbody>
+            @for (net of vm.config.network; track net.key) {
+              <tr>
+                <td class="mono">{{ net.key }}</td>
+                <td>{{ net.model || '—' }}</td>
+                <td class="mono">{{ net.mac || '—' }}</td>
+                <td>{{ net.bridge || '—' }}</td>
+                <td>{{ net.tag || '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+
+    <section class="panel">
+      <header class="panel__header"><h2>Console noVNC</h2></header>
+      @if (ticket(); as t) {
+        <dl class="details">
+          <dt>Hôte</dt>
+          <dd class="mono">{{ t.host }}</dd>
+          <dt>Port</dt>
+          <dd class="mono">{{ t.port ?? '—' }}</dd>
+          <dt>Nœud</dt>
+          <dd class="mono">{{ t.node }}</dd>
+          <dt>Ticket</dt>
+          <dd class="mono ticket">{{ t.ticket }}</dd>
+        </dl>
+        <p class="muted">
+          La connexion WebSocket vers Proxmox passera par un proxy nginx (étape à venir) :
+          l'affichage de la console n'est pas encore disponible.
+        </p>
+      } @else {
+        <p class="muted">
+          Le bouton « Console » demande un ticket d'accès à Proxmox. L'affichage noVNC
+          nécessite le proxy WebSocket, prévu lors d'une prochaine étape.
+        </p>
+      }
+    </section>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+  <!-- Graphiques d'historique                                             -->
+  <!-- ------------------------------------------------------------------ -->
+
+  <section class="panel history-panel">
+    <header class="panel__header">
+      <h2>Historique de la VM</h2>
+      <div class="segmented" role="group" aria-label="Période d'historique">
+        @for (item of timeframes; track item.value) {
+          <button
+            type="button"
+            class="segmented__item"
+            [class.is-active]="timeframe() === item.value"
+            (click)="setTimeframe(item.value)"
+          >
+            {{ item.label }}
+          </button>
+        }
+      </div>
+    </header>
+
+    @if (historyError(); as message) {
+      <p class="alert alert--error" role="alert">{{ message }}</p>
+    }
+
+    <div class="grid-2">
+      <div class="chart-block">
+        <h3>CPU (%)</h3>
+        @if (historyLoading()) {
+          <div class="skeleton skeleton--chart"></div>
+        } @else {
+          <app-line-chart
+            [series]="cpuSeries()"
+            [labels]="historyLabels()"
+            unit="%"
+            [height]="190"
+          />
+        }
+      </div>
+
+      <div class="chart-block">
+        <h3>RAM utilisée (Go)</h3>
+        @if (historyLoading()) {
+          <div class="skeleton skeleton--chart"></div>
+        } @else {
+          <app-line-chart
+            [series]="memorySeries()"
+            [labels]="historyLabels()"
+            unit="Go"
+            [height]="190"
+          />
+        }
+      </div>
+
+      <div class="chart-block">
+        <h3>Réseau (Ko/s)</h3>
+        @if (historyLoading()) {
+          <div class="skeleton skeleton--chart"></div>
+        } @else {
+          <app-line-chart
+            [series]="networkSeries()"
+            [labels]="historyLabels()"
+            unit="Ko/s"
+            [height]="190"
+          />
+        }
+      </div>
+
+      <div class="chart-block">
+        <h3>E/S disque (Ko/s)</h3>
+        @if (historyLoading()) {
+          <div class="skeleton skeleton--chart"></div>
+        } @else {
+          <app-bar-chart
+            [series]="diskSeries()"
+            [labels]="historyLabels()"
+            unit="Ko/s"
+            [height]="190"
+          />
+        }
+      </div>
+    </div>
+  </section>
+}

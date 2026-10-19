@@ -1,0 +1,43 @@
+<div class="login-page">
+  <form class="login-card" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <header class="login-card__header">
+      <span class="login-card__logo" aria-hidden="true">◈</span>
+      <h1>Selam Infra</h1>
+      <p>Pilotage du cluster Proxmox VE</p>
+    </header>
+
+    <label class="field">
+      <span>Identifiant</span>
+      <input
+        type="text"
+        formControlName="login"
+        autocomplete="username"
+        placeholder="admin ou technicien"
+        [attr.aria-invalid]="form.controls.login.invalid && form.controls.login.touched"
+      />
+    </label>
+
+    <label class="field">
+      <span>Mot de passe</span>
+      <input
+        type="password"
+        formControlName="password"
+        autocomplete="current-password"
+        placeholder="••••••••"
+        [attr.aria-invalid]="form.controls.password.invalid && form.controls.password.touched"
+      />
+    </label>
+
+    @if (error()) {
+      <p class="alert alert--error" role="alert">{{ error() }}</p>
+    }
+
+    <button class="btn btn--primary btn--block" type="submit" [disabled]="loading()">
+      {{ loading() ? 'Connexion…' : 'Se connecter' }}
+    </button>
+
+    <p class="login-card__hint">
+      Accès réservé aux comptes <strong>admin</strong> et <strong>technicien</strong>.
+    </p>
+  </form>
+</div>

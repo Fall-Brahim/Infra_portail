@@ -1,0 +1,28 @@
+<div class="shell">
+  <header class="shell__header">
+    <a class="shell__brand" routerLink="/cluster">
+      <span class="shell__logo" aria-hidden="true">◈</span>
+      <span>Selam Infra</span>
+    </a>
+
+    <nav class="shell__nav" aria-label="Navigation principale">
+      <a routerLink="/cluster" routerLinkActive="is-active">Cluster</a>
+      <a routerLink="/vms" routerLinkActive="is-active">VMs</a>
+      <a routerLink="/logs" routerLinkActive="is-active">Journal</a>
+    </nav>
+
+    <div class="shell__user">
+      @if (auth.user(); as user) {
+        <span class="shell__role" [class]="'is-' + (user.role ?? 'none')">{{
+          user.role ?? 'sans rôle'
+        }}</span>
+        <span class="shell__username" title="{{ user.email }}">{{ user.username }}</span>
+      }
+      <button class="btn btn--ghost" type="button" (click)="logout()">Déconnexion</button>
+    </div>
+  </header>
+
+  <main class="shell__content">
+    <router-outlet />
+  </main>
+</div>

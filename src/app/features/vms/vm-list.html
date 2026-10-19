@@ -1,0 +1,155 @@
+<header class="page-header">
+  <div>
+    <h1>Machines virtuelles</h1>
+    <p class="page-header__subtitle">{{ page().count }} élément(s) — VMs et conteneurs LXC</p>
+  </div>
+</header>
+
+<form class="filters" [formGroup]="filters" (ngSubmit)="applyFilters()">
+  <label class="field field--grow">
+    <span>Recherche</span>
+    <input type="search" formControlName="search" placeholder="Nom de la VM" />
+  </label>
+
+  <label class="field">
+    <span>État</span>
+    <select formControlName="status">
+      <option value="">Tous</option>
+      <option value="running">En marche</option>
+      <option value="stopped">Arrêtée</option>
+    </select>
+  </label>
+
+  <label class="field">
+    <span>Type</span>
+    <select formControlName="type">
+      <option value="">Tous</option>
+      <option value="qemu">VM (qemu)</option>
+      <option value="lxc">Conteneur (lxc)</option>
+    </select>
+  </label>
+
+  <label class="field">
+    <span>Nœud</span>
+    <input type="text" formControlName="node" placeholder="pve1" />
+  </label>
+
+  <label class="field">
+    <span>Pool</span>
+    <input type="text" formControlName="pool" placeholder="infra" />
+  </label>
+
+  <label class="field field--check">
+    <input type="checkbox" formControlName="include_templates" />
+    <span>Templates</span>
+  </label>
+
+  <div class="filters__actions">
+    <button class="btn btn--primary" type="submit">Filtrer</button>
+    <button class="btn btn--ghost" type="button" (click)="resetFilters()">Réinitialiser</button>
+  </div>
+</form>
+
+@if (error(); as message) {
+  <p class="alert alert--error" role="alert">{{ message }}</p>
+}
+@if (notices().length > 0) {
+  <div class="alert alert--success" role="status">
+    <ul class="notices">
+      @for (message of notices(); track message) {
+        <li>{{ message }}</li>
+      }
+    </ul>
+  </div>
+}
+
+<section class="panel">
+  @if (loading()) {
+    <p class="muted">Chargement…</p>
+  } @else if (page().results.length === 0) {
+    <p class="muted">Aucune machine ne correspond aux filtres.</p>
+  } @else {
+    <div class="table-wrapper">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nom</th>
+            <th>Type</th>
+            <th>Nœud</th>
+            <th>État</th>
+            <th>CPU</th>
+            <th>Mémoire</th>
+            <th>Disque</th>
+            <th>Uptime</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (vm of page().results; track vm.vmid) {
+            <tr [class.is-template]="vm.template">
+              <td class="mono">{{ vm.vmid }}</td>
+              <td>
+                <a [routerLink]="['/vms', vm.node, vm.vmid]">{{ vm.name }}</a>
+                @if (vm.template) {
+                  <span class="badge badge--muted">template</span>
+                }
+                @for (tag of vm.tags; track tag) {
+                  <span class="tag">{{ tag }}</span>
+                }
+              </td>
+              <td class="mono">{{ vm.type }}</td>
+              <td class="mono">{{ vm.node }}</td>
+              <td>
+                @if (pendingFor(vm); as pending) {
+                  <span class="badge badge--pending">
+                    <span class="spinner" aria-hidden="true"></span>
+                    {{ pending.label }}
+                  </span>
+                } @else {
+                  <span class="badge" [class.is-online]="vm.status === 'running'" [class.is-offline]="vm.status === 'stopped'">
+                    {{ statusLabel(vm.status) }}
+                  </span>
+                }
+              </td>
+              <td>{{ formatPercent(vm.cpu_pct) }}</td>
+              <td>{{ formatBytes(vm.mem_used) }} / {{ formatBytes(vm.mem_total) }}</td>
+              <td>{{ formatBytes(vm.disk) }}</td>
+              <td>{{ formatUptime(vm.uptime) }}</td>
+              <td class="actions">
+                @if (!vm.template) {
+                  @if (pendingFor(vm); as pending) {
+                    <span class="muted">Action en cours…</span>
+                  } @else if (vm.status === 'running') {
+                    <button class="btn btn--sm" type="button" (click)="runAction(vm, 'shutdown')">Arrêter</button>
+                    <button class="btn btn--sm" type="button" (click)="runAction(vm, 'reboot')">Redémarrer</button>
+                    <button class="btn btn--sm btn--danger" type="button" (click)="runAction(vm, 'stop')">Forcer</button>
+                  } @else {
+                    <button class="btn btn--sm btn--primary" type="button" (click)="runAction(vm, 'start')">Démarrer</button>
+                  }
+                } @else {
+                  <span class="muted">—</span>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="pagination">
+      <span class="muted">
+        Page {{ currentPage() }} / {{ totalPages }} — {{ page().count }} résultat(s)
+      </span>
+      <div class="pagination__buttons">
+        <button class="btn btn--sm" type="button" [disabled]="currentPage() <= 1" (click)="load(currentPage() - 1)">Précédent</button>
+        <button class="btn btn--sm" type="button" [disabled]="currentPage() >= totalPages" (click)="load(currentPage() + 1)">Suivant</button>
+        <select class="select--sm" [value]="pageSize()" (change)="changePageSize($any($event.target).value)">
+          <option [value]="25">25 / page</option>
+          <option [value]="50">50 / page</option>
+          <option [value]="100">100 / page</option>
+        </select>
+      </div>
+    </footer>
+  }
+</section>

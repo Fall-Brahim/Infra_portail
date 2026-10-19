@@ -1,0 +1,108 @@
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0.85rem 1.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 1.05rem;
+  }
+
+  &__logo {
+    color: var(--accent);
+    font-size: 1.3rem;
+  }
+
+  &__nav {
+    display: flex;
+    gap: 0.25rem;
+    flex: 1;
+
+    a {
+      padding: 0.4rem 0.85rem;
+      border-radius: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.92rem;
+
+      &:hover {
+        background: var(--surface-2);
+        color: var(--text);
+      }
+
+      &.is-active {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+    }
+  }
+
+  &__user {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  &__username {
+    font-size: 0.9rem;
+  }
+
+  &__role {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+
+    &.is-admin {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    &.is-technicien {
+      color: var(--info);
+      border-color: var(--info);
+    }
+  }
+
+  &__content {
+    flex: 1;
+    padding: 1.5rem;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell__header {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .shell__nav {
+    order: 3;
+    width: 100%;
+  }
+}
