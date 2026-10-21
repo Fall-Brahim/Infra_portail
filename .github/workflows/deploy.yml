@@ -1,0 +1,32 @@
+name: Deploy Frontend Angular to Proxmox VM
+
+on:
+  push:
+    branches:
+      - main  # Le déploiement se déclenche lors d'un push sur main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Déploiement via SSH sur la VM Proxmox
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT }}
+          script: |
+            echo "=== 1. Récupération des modifications Git ==="
+            cd ~/Infra_portail
+            git pull origin main
+
+            echo "=== 2. Lancement du déploiement Front-End ==="
+            bash ~/deploy-front.sh
+
+            echo "=== Déploiement du Front-End réussi ! ==="
+
